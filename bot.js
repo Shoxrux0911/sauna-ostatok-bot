@@ -23,6 +23,15 @@ if (!token || !secretToken) {
 
 const bot = new TelegramBot(token, {polling: true});
 
+// ==== ERROR HANDLING ====
+bot.on('polling_error', (error) => {
+    console.error(`Telegram Polling Error: ${error.code} - ${error.message}`);
+});
+
+bot.on('error', (error) => {
+    console.error(`Telegram Bot Error: ${error.message}`);
+});
+
 const SUBSCRIBERS_FILE = './subscribers.json';
 const AUTHORIZED_FILE = './authorized_users.json';
 
@@ -85,16 +94,33 @@ async function getOstatokMessage(brandFilter = 'all', catFilter = 'all') {
         if (loginRes.ok && loginData.code === 200) {
             const accessToken = loginData.data.access_token;
             
-            const productsUrl = 'https://api-admin.billz.ai/v2/products?limit=1000';
-            const productsRes = await fetch(productsUrl, {
-                method: 'GET',
-                headers: { 'accept': 'application/json', 'Authorization': `Bearer ${accessToken}` }
-            });
-            
-            if (productsRes.ok) {
-                const productsData = await productsRes.json();
+            let allProducts = [];
+            let page = 1;
+            let totalFetched = 0;
+            let totalCount = 0;
+
+            do {
+                const productsUrl = `https://api-admin.billz.ai/v2/products?limit=1000&page=${page}`;
+                const productsRes = await fetch(productsUrl, {
+                    method: 'GET',
+                    headers: { 'accept': 'application/json', 'Authorization': `Bearer ${accessToken}` }
+                });
                 
-                const targetProducts = productsData.products.filter(product => {
+                if (!productsRes.ok) break;
+
+                const productsData = await productsRes.json();
+                if (!productsData.products) break;
+
+                allProducts = allProducts.concat(productsData.products);
+                totalCount = productsData.count || 0;
+                totalFetched += productsData.products.length;
+                page++;
+
+            } while (totalFetched < totalCount);
+
+            console.log(`Fetched ${allProducts.length} products total from Billz (Total in DB: ${totalCount}).`);
+            
+            const targetProducts = allProducts.filter(product => {
                     const brandName = (product.brand_name || '').toLowerCase();
                     const productName = (product.name || '').toLowerCase();
                     const categoryNames = product.categories ? product.categories.map(c => c.name.toLowerCase()).join(' ') : '';
@@ -223,6 +249,12 @@ bot.onText(/\/start/, (msg) => {
 
     const welcomeText = `<b>Assalomu alaykum!</b>\n\nMen Billz tizimidan faqat <b>Lipa</b> va <b>Olxa</b> taxtalari qoldiqlarini ko'rsatuvchi botman.\n\nQaysi turdagi daraxt qoldig'ini ko'rmoqchisiz?`;
     bot.sendMessage(chatId, welcomeText, {parse_mode: 'HTML', ...getMainMenu()});
+});
+
+bot.onText(/\/status/, (msg) => {
+    const chatId = msg.chat.id;
+    if (!authorizedUsers.includes(chatId)) return;
+    bot.sendMessage(chatId, `✅ Bot ishlamoqda.\n🕒 Hozirgi vaqt: ${new Date().toLocaleString('uz-UZ', {timeZone: 'Asia/Tashkent'})}`);
 });
 
 // ==== XABARLARNI QABUL QILISH ====

@@ -1,0 +1,21 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  @apply bg-slate-900 text-slate-100;
+  margin: 0;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+}
+
+.glass-card {
+  @apply bg-slate-800/50 backdrop-blur-md border border-slate-700/50 rounded-2xl p-6 transition-all duration-300 hover:border-sky-500/30 hover:shadow-lg hover:shadow-sky-500/5;
+}
+
+.stat-value {
+  @apply text-3xl font-bold tracking-tight text-white;
+}
+
+.stat-label {
+  @apply text-sm font-medium text-slate-400 uppercase tracking-wider;
+}

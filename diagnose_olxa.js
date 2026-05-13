@@ -21,15 +21,28 @@ async function diagnose() {
         
         const productsData = await productsRes.json();
         
+        console.log(`--- FETCHED ${productsData.products.length} PRODUCTS TOTAL ---`);
+        console.log(`--- RESPONSE KEYS: ${Object.keys(productsData).join(', ')} ---`);
+        if (productsData.pagination) {
+            console.log(`--- PAGINATION: ${JSON.stringify(productsData.pagination)} ---`);
+        } else if (productsData.meta) {
+            console.log(`--- META: ${JSON.stringify(productsData.meta)} ---`);
+        }
         console.log('--- DIAGNOSING OLXA PRODUCTS ---');
         productsData.products.forEach(p => {
             const name = p.name || '';
             const brand = p.brand_name || '';
             const cats = p.categories ? p.categories.map(c => c.name).join(', ') : 'N/A';
+            let totalStock = 0;
+            if (p.shop_measurement_values && p.shop_measurement_values.length > 0) {
+                p.shop_measurement_values.forEach(shop => {
+                    totalStock += shop.active_measurement_value || 0;
+                });
+            }
             
             if (name.toLowerCase().includes('ольха') || name.toLowerCase().includes('olxa') || 
                 brand.toLowerCase().includes('ольха') || brand.toLowerCase().includes('olxa')) {
-                console.log(`Product: "${name}" | Brand: "${brand}" | Categories: [${cats}]`);
+                console.log(`Product: "${name}" | Brand: "${brand}" | Categories: [${cats}] | Stock: ${totalStock}`);
             }
         });
     } catch (e) {
