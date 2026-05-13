@@ -214,15 +214,12 @@ async function getOstatokMessage(brandFilter = 'all', catFilter = 'all') {
                 });
                 return message;
             } else {
-                return "❌ Tovarlarni tortib olishda xatolik yuz berdi.";
+                return "❌ API avtorizatsiyadan o'ta olmadi.";
             }
-        } else {
-            return "❌ API avtorizatsiyadan o'ta olmadi.";
+        } catch(e) {
+            return `❌ Xatolik yuz berdi: ${e.message}`;
         }
-    } catch(e) {
-        return `❌ Xatolik yuz berdi: ${e.message}`;
     }
-}
 
 // ==== ASOSIY MENYU FUNKSIYASI ====
 function getMainMenu() {
