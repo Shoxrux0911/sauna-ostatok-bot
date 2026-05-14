@@ -1,4 +1,4 @@
 node_modules/
 .env
 subscribers.json
-package-lock.json
+authorized_users.json
