@@ -212,55 +212,73 @@ async function getOstatokMessage(brandFilter = 'all') {
             return isSaunaCat || isPlankName;
         });
 
-        // 4. Faqat mavjud (stock > 0) mahsulotlar
+        // 4. Faqat mavjud (stock > 0) mahsulotlar, Lipa/Olxa belgisi bilan
         const available = [];
         targetProducts.forEach(p => {
             const stock = (p.shop_measurement_values || [])
                 .reduce((sum, s) => sum + (s.active_measurement_value || 0), 0);
-            if (stock > 0) available.push({ name: p.name, stock, brand: p.brand_name || '' });
+            if (stock > 0) {
+                const nm = (p.name || '').toLowerCase();
+                const br = (p.brand_name || '').toLowerCase();
+                const isLipa = br.includes('липа') || br.includes('lipa') || nm.includes('липа') || nm.includes('lipa');
+                available.push({ name: p.name, stock, brand: p.brand_name || '', isLipa });
+            }
         });
 
-        const label = brandFilter === 'lipa' ? 'LIPA' : brandFilter === 'olxa' ? 'OLXA' : 'LIPA VA OLXA';
+        const titleLabel = brandFilter === 'lipa' ? 'LIPA' : brandFilter === 'olxa' ? 'OLXA' : 'LIPA VA OLXA';
         if (available.length === 0) {
-            return `😔 Hozircha <b>${label}</b> sauna taxtalaridan nalichiyada qolmagan.`;
+            return `😔 Hozircha <b>${titleLabel}</b> sauna taxtalaridan nalichiyada qolmagan.`;
         }
 
-        // 5. Guruhlash va saralash
-        const grouped = {};
-        available.forEach(prod => {
-            const sizeMatch = prod.name.match(/(\d+[\.,]?\d*)\s*(?:м|m)?$/i);
-            prod.size = sizeMatch ? parseFloat(sizeMatch[1].replace(',', '.')) : 0;
+        // 5. Guruhlash yordamchi funksiyasi
+        function groupAndSort(products) {
+            const grouped = {};
+            products.forEach(prod => {
+                const sizeMatch = prod.name.match(/(\d+[\.,]?\d*)\s*(?:м|m)?$/i);
+                prod.size = sizeMatch ? parseFloat(sizeMatch[1].replace(',', '.')) : 0;
+                let cat = prod.name.replace(/(\/\s*)?\d+[\.,]?\d*\s*(?:м|m)?$/i, '').trim().replace(/[\/\-\\]$/, '').trim() || 'Boshqa';
+                if (!grouped[cat]) grouped[cat] = [];
+                grouped[cat].push(prod);
+            });
 
-            let cat = prod.name.replace(/(\/\s*)?\d+[\.,]?\d*\s*(?:м|m)?$/i, '').trim().replace(/[\/\-\\]$/, '').trim() || 'Boshqa';
-            if (!grouped[cat]) grouped[cat] = [];
-            grouped[cat].push(prod);
-        });
+            return Object.keys(grouped).sort((a, b) => {
+                const aL = a.toLowerCase(), bL = b.toLowerCase();
+                const aVag = aL.includes('вагонка') || aL.includes('vagonka');
+                const bVag = bL.includes('вагонка') || bL.includes('vagonka');
+                if (aVag && !bVag) return -1;
+                if (!aVag && bVag) return 1;
+                const aPol = aL.includes('полок') || aL.includes('polok');
+                const bPol = bL.includes('полок') || bL.includes('polok');
+                if (aPol && !bPol) return -1;
+                if (!aPol && bPol) return 1;
+                return a.localeCompare(b);
+            }).map(key => ({ key, items: grouped[key].sort((a, b) => a.size - b.size) }));
+        }
 
-        const sortedCats = Object.keys(grouped).sort((a, b) => {
-            const aL = a.toLowerCase(), bL = b.toLowerCase();
-            const aVag = aL.includes('вагонка') || aL.includes('vagonka');
-            const bVag = bL.includes('вагонка') || bL.includes('vagonka');
-            if (aVag && !bVag) return -1;
-            if (!aVag && bVag) return 1;
-            const aPol = aL.includes('полок') || aL.includes('polok');
-            const bPol = bL.includes('полок') || bL.includes('polok');
-            if (aPol && !bPol) return -1;
-            if (!aPol && bPol) return 1;
-            return a.localeCompare(b);
-        });
+        function renderSection(title, emoji, products) {
+            if (products.length === 0) return '';
+            let out = `${emoji} <b>${title}</b>\n\n`;
+            groupAndSort(products).forEach(({ key, items }) => {
+                out += `🔸 <b>${key.toUpperCase()}</b>\n➖➖➖➖➖➖➖➖➖➖\n`;
+                items.forEach(prod => {
+                    const lbl = prod.size > 0 ? `${prod.size} m` : prod.name;
+                    out += `🔹 ${lbl} — <b>${prod.stock} m</b>\n`;
+                });
+                out += '\n\n';
+            });
+            return out;
+        }
 
-        let msg = `🌲 <b>Nalichiyadagi ${label} (SAUNA TAXTA) qoldig'i</b> 🪵\n`;
+        let msg = `🌲 <b>Nalichiyadagi ${titleLabel} (SAUNA TAXTA) qoldig'i</b> 🪵\n`;
         msg += `📅 <i>${new Date().toLocaleString('uz-UZ', { timeZone: 'Asia/Tashkent' })}</i>\n\n`;
 
-        sortedCats.forEach(key => {
-            grouped[key].sort((a, b) => a.size - b.size);
-            msg += `🔸 <b>${key.toUpperCase()}</b>\n➖➖➖➖➖➖➖➖➖➖\n`;
-            grouped[key].forEach(prod => {
-                const label = prod.size > 0 ? `${prod.size} m` : prod.name;
-                msg += `🔹 ${label} — <b>${prod.stock} m</b>\n`;
-            });
-            msg += '\n\n';
-        });
+        if (brandFilter === 'all') {
+            msg += renderSection('🌳 LIPA TAXTALAR', '🌳', available.filter(p => p.isLipa));
+            msg += renderSection('🌲 OLXA TAXTALAR', '🌲', available.filter(p => !p.isLipa));
+        } else {
+            const emoji = brandFilter === 'lipa' ? '🌳' : '🌲';
+            msg += renderSection(`${emoji} ${titleLabel} TAXTALAR`, emoji, available);
+        }
 
         return msg;
 
